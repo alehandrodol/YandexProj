@@ -6,7 +6,7 @@ from enum import Enum, unique
 
 from pydantic import BaseModel, validator
 
-from .exceptions import InvalidUUID, InvalidDateFormat
+from .exceptions import ElementIdException, InvalidDateFormat, IdExceptionsTypes
 
 UUID_64_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$'
 
@@ -16,6 +16,9 @@ class ShopUnitType(Enum):
     offer = "OFFER"
     category = "CATEGORY"
 
+    def __str__(self):
+        return self.value
+
 
 class ShopUnit(BaseModel):
     id: str
@@ -23,8 +26,13 @@ class ShopUnit(BaseModel):
     date: str
     parentId: str | None = None
     type: ShopUnitType
-    price: int = None
-    children: list[ShopUnit] = []
+    price: int | None = None
+    children: list[ShopUnit] | None
+
+    class Config:
+        json_encoders = {
+            ShopUnitType: lambda v: str(v)
+        }
 
 
 class ShopUnitImport(BaseModel):
@@ -37,7 +45,8 @@ class ShopUnitImport(BaseModel):
     @validator("id")
     def validate_uuid(cls, id: str):
         if not re.fullmatch(UUID_64_pattern, id):
-            raise InvalidUUID
+            raise ElementIdException(IdExceptionsTypes.uuid)
+        return id
 
 
 class ShopUnitImportRequest(BaseModel):
@@ -50,6 +59,7 @@ class ShopUnitImportRequest(BaseModel):
             new_date: datetime = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.000Z")
         except ValueError:
             raise InvalidDateFormat
+        return date
 
 
 class ShopUnitStatisticUnit(BaseModel):
@@ -59,6 +69,11 @@ class ShopUnitStatisticUnit(BaseModel):
     type: ShopUnitType
     price: int = None
     date: str
+
+    class Config:
+        json_encoders = {
+            ShopUnitType: lambda v: str(v)
+        }
 
 
 class ShopUnitStatisticResponse(BaseModel):

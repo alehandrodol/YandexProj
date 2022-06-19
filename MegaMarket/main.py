@@ -39,6 +39,11 @@ def custom_openapi():
         except KeyError:
             pass
 
+        try:
+            del openapi_schema["paths"][method]["get"]["responses"]["422"]
+        except KeyError:
+            pass
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 

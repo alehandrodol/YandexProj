@@ -1,3 +1,12 @@
+from enum import Enum, unique
+
+
+@unique
+class IdExceptionsTypes(Enum):
+    uuid = "uuid"
+    not_found = "not found"
+
+
 class InvalidImport(Exception):
     """Невалидная схема документа или входные данные не верны."""
 
@@ -8,10 +17,14 @@ class InvalidImport(Exception):
         return self.message
 
 
-class InvalidUUID(Exception):
+class ElementIdException(Exception):
     """Невалидная запись ID"""
-    def __init__(self):
-        self.message = "Invalid uuid format"
+    def __init__(self, exception_type: IdExceptionsTypes):
+        self.type = exception_type
+        if exception_type == IdExceptionsTypes.uuid:
+            self.message = "Invalid uuid format"
+        elif exception_type == IdExceptionsTypes.not_found:
+            self.message = "Element with given ID is not found"
 
     def __str__(self):
         return self.message
