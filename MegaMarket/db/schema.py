@@ -1,7 +1,6 @@
-from api.schema import ShopUnitType
-
 from sqlalchemy import Column, Integer, String, DateTime, Enum as PgEnum
 
+from api.schema import ShopUnitType
 from main import Base
 
 

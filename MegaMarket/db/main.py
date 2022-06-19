@@ -1,8 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from fastapi import Request
-
 
 # берем параметры БД из переменных окружения //TODO поменять на переменные окружения
 # DB_USER = environ.get("DB_USER", "user")

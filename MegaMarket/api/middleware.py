@@ -1,7 +1,7 @@
-from main import app
-from db.main import SessionLocal
-
 from fastapi import Request, Response
+
+from db.main import SessionLocal
+from main import app
 
 
 @app.middleware("http")

@@ -1,7 +1,8 @@
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-from fastapi.openapi.utils import get_openapi
 from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse
+
 from db.main import Base, engine
 from api.routes import routes
 
@@ -30,6 +31,11 @@ def custom_openapi():
     for method in openapi_schema["paths"]:
         try:
             del openapi_schema["paths"][method]["post"]["responses"]["422"]
+        except KeyError:
+            pass
+
+        try:
+            del openapi_schema["paths"][method]["delete"]["responses"]["422"]
         except KeyError:
             pass
 
