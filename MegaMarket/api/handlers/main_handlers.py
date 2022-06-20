@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from api.exceptions import InvalidImport, ElementIdException, IdExceptionsTypes
@@ -67,14 +68,22 @@ async def make_import(items: ShopUnitImportRequest,
         except InvalidImport as e:
             return JSONResponse(status_code=400,
                                 content={"code": 400, "message": e.message})
-    for unit in res_list:  # обновление родителей и добавления/обновление в базу всех элементов из запроса
+
+    # Создаём id данного реквеста
+    import_id: ShopUnitUpdatesDB = db.query(ShopUnitUpdatesDB).\
+        order_by(desc(ShopUnitUpdatesDB.import_request_id)).first()
+    if import_id is not None:
+        import_id: int = import_id.import_request_id + 1
+    else:
+        import_id: int = 0
+
+    for unit in res_list:  # добавления/обновление в базу всех элементов из запроса
         add_and_refresh_db(unit, db)
-        if unit.parent_category is not None:
-            update_parents(unit.parent_category, items.updateDate, db)
-    # Создание update логов, нужно вылнять после занесения всех элементов в таблицу для
-    # корректного определения цены категорий
-    for unit in res_list:
-        make_update_log(unit, db)
+
+    for unit in res_list:  # Создаём update логи для элемента и родителей
+        make_update_log(unit, import_id, db)
+        if unit.parent_category is not None and (unit.type != ShopUnitType.category):
+            update_parents(unit.parent_category, items.updateDate, import_id, db)
     return status.HTTP_200_OK
 
 

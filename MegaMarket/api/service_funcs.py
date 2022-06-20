@@ -117,7 +117,7 @@ def get_element_with_validation(element_id: str, db: Session) -> ShopUnitsDB:
     return element
 
 
-def update_parents(parent_id: str, date: str, db: Session) -> None:
+def update_parents(parent_id: str, date: str, import_id: int, db: Session) -> None:
     """Данна функция обновляет дату всех предков, и создаёт логи об их обновлениях"""
     parent: ShopUnitsDB = db.query(ShopUnitsDB).filter(ShopUnitsDB.id == parent_id).first()
     if parent is None:
@@ -125,20 +125,25 @@ def update_parents(parent_id: str, date: str, db: Session) -> None:
 
     parent.last_update = date
     if parent.parent_category is not None:
-        update_parents(parent.parent_category, date, db)
+        update_parents(parent.parent_category, date, import_id, db)
     add_and_refresh_db(parent, db)
-    make_update_log(parent, db)
+    make_update_log(parent, import_id, db)
     return
 
 
-def make_update_log(inst: ShopUnitsDB, db: Session) -> None:
+def make_update_log(inst: ShopUnitsDB, import_id: int, db: Session) -> None:
     """Функция для создания лога об обновлении элемента"""
+    check_duplicate: ShopUnitUpdatesDB = db.query(ShopUnitUpdatesDB).filter(ShopUnitUpdatesDB.unit_id == inst.id).\
+        filter(ShopUnitUpdatesDB.import_request_id == import_id).first()
+    if check_duplicate is not None:  # Проверяем сделали ли мы уже для данного юнит апдейт лог, если да, то пропускаем
+        return
     logDB: ShopUnitUpdatesDB = ShopUnitUpdatesDB(
         unit_id=inst.id,
         name=inst.name,
         price=inst.price if inst.type == ShopUnitType.offer else get_category_price(inst.id, db, []),
         parent_category=inst.parent_category,
-        update_date=inst.last_update
+        update_date=inst.last_update,
+        import_request_id=import_id
     )
     add_and_refresh_db(logDB, db)
     return

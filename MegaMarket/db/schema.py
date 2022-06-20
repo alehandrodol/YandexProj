@@ -27,6 +27,7 @@ class ShopUnitUpdatesDB(Base):
     price = Column(Integer, nullable=True)
     parent_category = Column(String, nullable=True)
     update_date = Column(DateTime, nullable=False)
+    import_request_id = Column(Integer, nullable=False)
 
     unit = relationship("ShopUnitsDB", back_populates="update")
 

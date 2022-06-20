@@ -78,7 +78,7 @@ async def units_updated_in_range(id: str, dateStart: str, dateEnd: str, db: Sess
         return JSONResponse(status_code=400, content={"code": 400, "message": "Validation Failed"})
     items: list[ShopUnitUpdatesDB] = db.query(ShopUnitUpdatesDB).filter(ShopUnitUpdatesDB.unit_id == id).\
         filter(ShopUnitUpdatesDB.update_date >= new_date_start).\
-        filter(ShopUnitUpdatesDB.update_date < new_date_end).order_by(asc(ShopUnitUpdatesDB.update_date)).all()
+        filter(ShopUnitUpdatesDB.update_date < new_date_end).order_by(asc(ShopUnitUpdatesDB.id)).all()
     res_list: list[ShopUnitStatisticUnit] = []
     for update in items:
         unit: ShopUnitsDB = db.query(ShopUnitsDB).filter(ShopUnitsDB.id == update.unit_id).first()
