@@ -1,23 +1,21 @@
 import json
-from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import asc
 from sqlalchemy.orm import Session
 
 from api.exceptions import InvalidImport, ElementIdException, IdExceptionsTypes
-from api.schema import ShopUnitImportRequest, ShopUnitStatisticResponse, ShopUnitStatisticUnit, ShopUnitImport, ShopUnitType, ShopUnit, Error
-from api.service_funcs import from_pyschema_to_db_schema, add_and_refresh_db, delete_all_children, get_all_children, get_category_price, get_element_with_validation, update_parents, make_update_log
+from api.schema import ShopUnitImportRequest, ShopUnitImport, ShopUnitType, ShopUnit, Error
+from api.service_funcs import from_pyschema_to_db_schema, add_and_refresh_db, delete_all_children, get_all_children, \
+    get_category_price, get_element_with_validation, update_parents, make_update_log
 from db.main import get_db
 from db.schema import ShopUnitsDB, ShopUnitUpdatesDB
-
 
 router = APIRouter()  # Создание роутера, который хранит все пути в данном файле к ручкам и передаёт в main app
 
 
-# Класс в котором лежат все модели и описания респозов
+# Класс в котором лежат все модели и описания респонзов
 class MyResponses:
     imports: dict[int, dict[str, Any]] = \
         {
@@ -40,7 +38,7 @@ class MyResponses:
         }
 
 
-@router.post("/imports", responses=MyResponses.imports)
+@router.post("/imports", responses=MyResponses.imports, tags=["main tasks"])
 async def make_import(items: ShopUnitImportRequest,
                       db: Session = Depends(get_db)) -> str | JSONResponse:
     """
@@ -80,23 +78,28 @@ async def make_import(items: ShopUnitImportRequest,
     return status.HTTP_200_OK
 
 
-@router.delete("/delete/{id}", responses=MyResponses.delete)
-def delete_element(id: str, db: Session = Depends(get_db)) -> str | JSONResponse:
+@router.delete("/delete/{id}", responses=MyResponses.delete, tags=["main tasks"])
+async def delete_element(id: str, db: Session = Depends(get_db)) -> str | JSONResponse:
     """Handler для удаления юнита и всех его дочерних элементов"""
-    element: ShopUnitsDB = get_element_with_validation(element_id=id, db=db)
+    try:
+        element: ShopUnitsDB = get_element_with_validation(element_id=id, db=db)
+    except ElementIdException as e:
+        status_code = 400 if e.type == IdExceptionsTypes.uuid else 404
+        return JSONResponse(status_code=status_code,
+                            content={"code": status_code, "message": e.message})
+
+    db.query(ShopUnitUpdatesDB).filter(ShopUnitUpdatesDB.unit_id == id).delete()
+    db.commit()
 
     delete_all_children(elem_id=id, db=db)
     db.delete(element)
     db.commit()
 
-    db.query(ShopUnitUpdatesDB).filter(ShopUnitUpdatesDB.unit_id == id).delete()
-    db.commit()
-
     return status.HTTP_200_OK
 
 
-@router.get("/nodes/{id}", responses=MyResponses.get_node)
-def get_info_about_element(id: str, db: Session = Depends(get_db)) -> JSONResponse:
+@router.get("/nodes/{id}", responses=MyResponses.get_node, tags=["main tasks"])
+async def get_info_about_element(id: str, db: Session = Depends(get_db)) -> JSONResponse:
     """Handler, который возвращает информацию о юните из магазина."""
     try:
         element: ShopUnitsDB = get_element_with_validation(element_id=id, db=db)

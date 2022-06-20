@@ -6,8 +6,19 @@ from fastapi.responses import JSONResponse
 from db.main import Base, engine
 from api.routes import routes
 
-Base.metadata.create_all(bind=engine)
-app = FastAPI()
+tags_metadata = [
+    {
+        "name": "main tasks",
+        "description": "Classic operations like add/update, delete, show",
+    },
+    {
+        "name": "additional tasks",
+        "description": "Information about updates",
+    },
+]
+
+Base.metadata.create_all(bind=engine)  # Создание всех таблиц, если таблица уже существует, она не обновится, нужен drop
+app = FastAPI(openapi_tags=tags_metadata)  # Инициализация приложения
 app.include_router(routes)
 
 
@@ -21,6 +32,7 @@ async def validation_exception_handler(request, exc):
 
 
 def custom_openapi():
+    """Функция для редактирования openapi схемы"""
     if app.openapi_schema:
         return app.openapi_schema
     openapi_schema = get_openapi(title="MegaMarketApi",
@@ -48,6 +60,6 @@ def custom_openapi():
     return app.openapi_schema
 
 
-app.openapi = custom_openapi
+app.openapi = custom_openapi  # Применения новой openapi схемы
 
 

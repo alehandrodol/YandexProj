@@ -7,7 +7,7 @@ class IdExceptionsTypes(Enum):
     not_found = "not found"
 
 
-class InvalidImport(Exception):
+class InvalidImport(ValueError):
     """Невалидная схема документа или входные данные не верны."""
 
     def __init__(self, message):
@@ -17,7 +17,7 @@ class InvalidImport(Exception):
         return self.message
 
 
-class ElementIdException(Exception):
+class ElementIdException(ValueError):
     """Невалидная запись ID"""
     def __init__(self, exception_type: IdExceptionsTypes):
         self.type = exception_type
@@ -30,7 +30,7 @@ class ElementIdException(Exception):
         return self.message
 
 
-class InvalidDateFormat(Exception):
+class InvalidDateFormat(ValueError):
     """Невалидная запись времени"""
 
     def __init__(self):

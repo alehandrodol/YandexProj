@@ -7,14 +7,16 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import asc
 from sqlalchemy.orm import Session
 
+from api.exceptions import ElementIdException, IdExceptionsTypes
 from api.schema import ShopUnitStatisticResponse, ShopUnitStatisticUnit, ShopUnitType, Error
+from api.service_funcs import get_element_with_validation
 from db.main import get_db
 from db.schema import ShopUnitsDB, ShopUnitUpdatesDB
 
+router = APIRouter()  # Создание роутера, который хранит все пути в данном файле к ручкам и передаёт в main app
 
-router = APIRouter()
 
-
+# Класс в котором лежат все модели и описания респонзов
 class MyResponses:
     sales: dict[int, dict[str, Any]] = \
         {
@@ -30,8 +32,9 @@ class MyResponses:
         }
 
 
-@router.get("/sales", responses=MyResponses.sales)
-def info_about_last_updates(date: str, db: Session = Depends(get_db)) -> JSONResponse:
+@router.get("/sales", responses=MyResponses.sales, tags=["additional tasks"])
+async def info_about_last_updates(date: str, db: Session = Depends(get_db)) -> JSONResponse:
+    """Получение списка **товаров**, цена которых была обновлена за последние 24 часа"""
     try:
         new_date: datetime = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.000Z")
     except ValueError:
@@ -55,8 +58,15 @@ def info_about_last_updates(date: str, db: Session = Depends(get_db)) -> JSONRes
     return JSONResponse(status_code=200, content=json.loads(response.json()))
 
 
-@router.get("/node/{id}/statistic", responses=MyResponses.node_stats)
-def units_updated_in_range(id: str, dateStart: str, dateEnd: str, db: Session = Depends(get_db)) -> JSONResponse:
+@router.get("/node/{id}/statistic", responses=MyResponses.node_stats, tags=["additional tasks"])
+async def units_updated_in_range(id: str, dateStart: str, dateEnd: str, db: Session = Depends(get_db)) -> JSONResponse:
+    """Получение статистики (истории обновлений) по товару/категории за заданный полуинтервал [from, to)."""
+    try:
+        get_element_with_validation(element_id=id, db=db)
+    except ElementIdException as e:
+        status_code = 400 if e.type == IdExceptionsTypes.uuid else 404
+        return JSONResponse(status_code=status_code,
+                            content={"code": status_code, "message": e.message})
     try:
         new_date_start: datetime = datetime.strptime(dateStart, "%Y-%m-%dT%H:%M:%S.000Z")
     except ValueError:
