@@ -1,0 +1,21 @@
+version: "3.2"
+
+services:
+  back:
+    build: ./
+    ports:
+      - 80:80
+    restart: always
+
+  root-db:
+    image: postgres
+    restart: always
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: 3M6LmXmNE3E4q3k2y5hwRna75YbYC3xn
+      POSTGRES_USER: postgres
+      POSTGRES_DB: yandex_project
+
+volumes:
+  db_data: {}
