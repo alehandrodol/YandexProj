@@ -9,13 +9,15 @@ from sqlalchemy.orm import Session
 
 from api.exceptions import InvalidImport, ElementIdException, IdExceptionsTypes
 from api.schema import ShopUnitImportRequest, ShopUnitStatisticResponse, ShopUnitStatisticUnit, ShopUnitImport, ShopUnitType, ShopUnit, Error
-from api.service_funcs import from_pyschema_to_db_schema, add_and_refresh_db, delete_all_children, get_all_children, get_category_price, get_element_with_validation, update_parents
+from api.service_funcs import from_pyschema_to_db_schema, add_and_refresh_db, delete_all_children, get_all_children, get_category_price, get_element_with_validation, update_parents, make_update_log
 from db.main import get_db
 from db.schema import ShopUnitsDB, ShopUnitUpdatesDB
 
-router = APIRouter()
+
+router = APIRouter()  # Создание роутера, который хранит все пути в данном файле к ручкам и передаёт в main app
 
 
+# Класс в котором лежат все модели и описания респозов
 class MyResponses:
     imports: dict[int, dict[str, Any]] = \
         {
@@ -37,26 +39,21 @@ class MyResponses:
             404: {"model": Error, "description": "Категория/товар не найден."}
         }
 
-    sales: dict[int, dict[str, Any]] = \
-        {
-            200: {"model": ShopUnitStatisticResponse, "description": "Список товаров, цена которых была обновлена."},
-            400: {"model": Error, "description": "Невалидная схема документа или входные данные не верны."}
-        }
-
-    node_stats: dict[int, dict[str, Any]] = \
-        {
-            200: {"model": ShopUnitStatisticResponse, "description": "Список товаров, цена которых была обновлена."},
-            400: {"model": Error, "description": "Некорректный формат запроса или некорректные даты интервала."},
-            404: {"model": Error, "description": "Категория/товар не найден."}
-        }
-
 
 @router.post("/imports", responses=MyResponses.imports)
 async def make_import(items: ShopUnitImportRequest,
                       db: Session = Depends(get_db)) -> str | JSONResponse:
-    request_ids = {}
-    res_list: list[ShopUnitsDB] = []
-    for item in items.items:
+    """
+    Handler для импорта и обновления элементов таблицы ShopUnitDB,
+    которые являются категориями и товарами данного магазина.
+    Все юниты проходят валидации и в случае успеха, обновляют таблицу,
+    в таблицу ShopUnitUpdatesDB кладётся лог об обновлении каждого элемента для сохранения истории.
+    """
+    # Словарь со всеми id данного запроса, для валидации повторений и со значениями в виде типа юнита,
+    # для поиска родительской категории во время валидации.
+    request_ids: dict[str, ShopUnitType] = {}
+    res_list: list[ShopUnitsDB] = []  # Список в котором будут лежать отваледированные товары
+    for item in items.items:  # Валидация повторений id и заполнения словарь request_ids
         item: ShopUnitImport = item
         if item.id in request_ids.keys():
             return JSONResponse(status_code=400,
@@ -64,7 +61,7 @@ async def make_import(items: ShopUnitImportRequest,
         item_from_fb: ShopUnitsDB = db.query(ShopUnitsDB).filter(ShopUnitsDB.id == item.id).first()
         request_ids[item.id] = item.type if item_from_fb is None else item_from_fb.type
 
-    for item in items.items:
+    for item in items.items:  # Цикол с заключительными валидациями, после чего добавляются в res_list
         item: ShopUnitImport = item
         try:
             item: ShopUnitsDB = from_pyschema_to_db_schema(item, items.updateDate, request_ids, db)
@@ -72,19 +69,27 @@ async def make_import(items: ShopUnitImportRequest,
         except InvalidImport as e:
             return JSONResponse(status_code=400,
                                 content={"code": 400, "message": e.message})
-    for unit in res_list:
+    for unit in res_list:  # обновление родителей и добавления/обновление в базу всех элементов из запроса
+        add_and_refresh_db(unit, db)
         if unit.parent_category is not None:
             update_parents(unit.parent_category, items.updateDate, db)
-        add_and_refresh_db(unit, db)
+    # Создание update логов, нужно вылнять после занесения всех элементов в таблицу для
+    # корректного определения цены категорий
+    for unit in res_list:
+        make_update_log(unit, db)
     return status.HTTP_200_OK
 
 
 @router.delete("/delete/{id}", responses=MyResponses.delete)
 def delete_element(id: str, db: Session = Depends(get_db)) -> str | JSONResponse:
+    """Handler для удаления юнита и всех его дочерних элементов"""
     element: ShopUnitsDB = get_element_with_validation(element_id=id, db=db)
 
     delete_all_children(elem_id=id, db=db)
     db.delete(element)
+    db.commit()
+
+    db.query(ShopUnitUpdatesDB).filter(ShopUnitUpdatesDB.unit_id == id).delete()
     db.commit()
 
     return status.HTTP_200_OK
@@ -92,6 +97,7 @@ def delete_element(id: str, db: Session = Depends(get_db)) -> str | JSONResponse
 
 @router.get("/nodes/{id}", responses=MyResponses.get_node)
 def get_info_about_element(id: str, db: Session = Depends(get_db)) -> JSONResponse:
+    """Handler, который возвращает информацию о юните из магазина."""
     try:
         element: ShopUnitsDB = get_element_with_validation(element_id=id, db=db)
     except ElementIdException as e:
@@ -110,58 +116,3 @@ def get_info_about_element(id: str, db: Session = Depends(get_db)) -> JSONRespon
             children=None if element.type == ShopUnitType.offer else children_list
         )
     return JSONResponse(status_code=200, content=json.loads(res_node.json()))
-
-
-@router.get("/sales", responses=MyResponses.sales)
-def info_about_last_updates(date: str, db: Session = Depends(get_db)) -> JSONResponse:
-    try:
-        new_date: datetime = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.000Z")
-    except ValueError:
-        return JSONResponse(status_code=400, content={"code": 400, "message": "Validation Failed"})
-
-    day_ago_time: datetime = new_date - timedelta(hours=24)
-    items: list[ShopUnitsDB] = db.query(ShopUnitsDB).filter(ShopUnitsDB.last_update >= day_ago_time).\
-        filter(ShopUnitsDB.last_update <= new_date).filter(ShopUnitsDB.type == ShopUnitType.offer).all()
-    res_list: list[ShopUnitStatisticUnit] = []
-    for item in items:
-        new_item: ShopUnitStatisticUnit = ShopUnitStatisticUnit(
-            id=item.id,
-            name=item.name,
-            parentId=item.parent_category,
-            type=item.type,
-            price=item.price,
-            date=item.last_update.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        )
-        res_list.append(new_item)
-    response = ShopUnitStatisticResponse(items=res_list)
-    return JSONResponse(status_code=200, content=json.loads(response.json()))
-
-
-@router.get("/node/{id}/statistic", responses=MyResponses.node_stats)
-def units_updated_in_range(id: str, dateStart: str, dateEnd: str, db: Session = Depends(get_db)) -> JSONResponse:
-    try:
-        new_date_start: datetime = datetime.strptime(dateStart, "%Y-%m-%dT%H:%M:%S.000Z")
-    except ValueError:
-        return JSONResponse(status_code=400, content={"code": 400, "message": "Validation Failed"})
-
-    try:
-        new_date_end: datetime = datetime.strptime(dateEnd, "%Y-%m-%dT%H:%M:%S.000Z")
-    except ValueError:
-        return JSONResponse(status_code=400, content={"code": 400, "message": "Validation Failed"})
-    items: list[ShopUnitUpdatesDB] = db.query(ShopUnitUpdatesDB).filter(ShopUnitUpdatesDB.unit_id == id).\
-        filter(ShopUnitUpdatesDB.date > new_date_start).\
-        filter(ShopUnitUpdatesDB.date < new_date_end).order_by(asc(ShopUnitUpdatesDB.update_date)).all()
-    res_list: list[ShopUnitStatisticUnit] = []
-    for update in items:
-        unit: ShopUnitsDB = db.query(ShopUnitsDB).filter(ShopUnitsDB.id == update.unit_id).first()
-        res_unit: ShopUnitStatisticUnit = ShopUnitStatisticUnit(
-            id=unit.id,
-            name=update.name,
-            parentId=update.parent_category,
-            type=unit.type,
-            price=update.price,
-            date=update.update_date
-        )
-        res_list.append(res_unit)
-    response = ShopUnitStatisticResponse(items=res_list)
-    return JSONResponse(status_code=200, content=json.loads(response.json()))

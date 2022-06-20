@@ -1,8 +1,7 @@
 import re
 from sqlalchemy.orm import Session
-from typing import NamedTuple
 
-from db.schema import ShopUnitsDB
+from db.schema import ShopUnitsDB, ShopUnitUpdatesDB
 from .exceptions import InvalidImport, ElementIdException, IdExceptionsTypes
 from .schema import ShopUnitImport, ShopUnitType, ShopUnit, UUID_64_pattern
 
@@ -48,7 +47,10 @@ def from_pyschema_to_db_schema(item: ShopUnitImport, date: str,
 def delete_all_children(elem_id: str, db: Session):
     current_children: list[ShopUnitsDB] = db.query(ShopUnitsDB).filter(ShopUnitsDB.parent_category == elem_id).all()
     for child in current_children:
+        db.query(ShopUnitUpdatesDB).filter(ShopUnitUpdatesDB.unit_id == child.id).delete()
+        db.commit()
         delete_all_children(child.id, db)
+
     db.query(ShopUnitsDB).filter(ShopUnitsDB.parent_category == elem_id).delete()
     db.commit()
     return
@@ -104,6 +106,19 @@ def update_parents(parent_id: str, date: str, db: Session) -> None:
     if parent.parent_category is not None:
         update_parents(parent.parent_category, date, db)
     add_and_refresh_db(parent, db)
+    make_update_log(parent, db)
+    return
+
+
+def make_update_log(inst: ShopUnitsDB, db: Session) -> None:
+    logDB: ShopUnitUpdatesDB = ShopUnitUpdatesDB(
+        unit_id=inst.id,
+        name=inst.name,
+        price=inst.price if inst.type == ShopUnitType.offer else get_category_price(inst.id, db, []),
+        parent_category=inst.parent_category,
+        update_date=inst.last_update
+    )
+    add_and_refresh_db(logDB, db)
     return
 
 
