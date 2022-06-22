@@ -3,8 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 
-#SQLALCHEMY_DATABASE_URL = "postgresql://postgres:3M6LmXmNE3E4q3k2y5hwRna75YbYC3xn@root-db/yandex_project"
-SQLALCHEMY_DATABASE_URL = "postgresql://postgres:tozafa30@localhost/YandexProject"
+SQLALCHEMY_DATABASE_URL = "postgresql://postgres:3M6LmXmNE3E4q3k2y5hwRna75YbYC3xn@root-db/yandex_project"
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL
 )
