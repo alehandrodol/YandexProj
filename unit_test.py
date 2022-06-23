@@ -85,6 +85,97 @@ IMPORT_BATCHES = [
             }
         ],
         "updateDate": "2022-02-03T15:00:00.000Z"
+    },
+]
+
+IMPORT_BATCHES2 = [
+    {
+        "items": [
+            {
+                "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                "name": "Техника",
+                "parentId": None,
+                "type": "CATEGORY"
+            }
+        ],
+        "updateDate": "2022-02-01T15:00:00.000Z"
+    },
+    {
+        "items": [
+            {
+                "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df2",
+                "name": "Смартфоны",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                "type": "CATEGORY"
+            }
+        ],
+        "updateDate": "2022-02-02T15:00:00.000Z"
+    },
+    {
+        "items": [
+            {
+                "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df3",
+                "name": "Смартфон№1",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df2",
+                "type": "OFFER",
+                "price": 5000
+            }
+        ],
+        "updateDate": "2022-02-03T15:00:00.000Z"
+    },
+    {
+        "items": [
+            {
+                "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df4",
+                "name": "Смартфон№2",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df2",
+                "type": "OFFER",
+                "price": 6000
+            }
+        ],
+        "updateDate": "2022-02-04T15:00:00.000Z"
+    },
+    {
+        "items": [
+            {
+                "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df5",
+                "name": "Кофеварки",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                "type": "CATEGORY"
+            }
+        ],
+        "updateDate": "2022-02-05T15:00:00.000Z"
+    },
+    {
+        "items": [
+            {
+                "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df3",
+                "name": "Смартфон№1",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df2",
+                "type": "OFFER",
+                "price": 15000
+            },
+            {
+                "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df4",
+                "name": "Смартфон№2",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df2",
+                "type": "OFFER",
+                "price": 9000
+            }
+        ],
+        "updateDate": "2022-02-07T15:00:00.000Z"
+    },
+    {
+        "items": [
+            {
+                "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df6",
+                "name": "Кофеварка№1",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df5",
+                "type": "OFFER",
+                "price": 10000
+            }
+        ],
+        "updateDate": "2022-02-08T15:00:00.000Z"
     }
 ]
 
@@ -212,7 +303,7 @@ def print_diff(expected, response):
 
 
 def test_import():
-    for index, batch in enumerate(IMPORT_BATCHES):
+    for index, batch in enumerate(IMPORT_BATCHES2):
         print(f"Importing batch {index}")
         status, _ = request("/imports", method="POST", data=batch)
 
@@ -278,7 +369,7 @@ def test_all():
 
 def main():
     global API_BASEURL
-    test_name = None
+    test_name = "import"
 
     for arg in sys.argv[1:]:
         if re.match(r"^https?://", arg):
